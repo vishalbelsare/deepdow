@@ -1,0 +1,72 @@
+name: Lint and test
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  linting:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Cancel previous workflows that are still running
+      uses: styfle/cancel-workflow-action@0.8.0
+      with:
+        access_token: ${{ github.token }}
+
+    - name: Checkout most recent commit
+      uses: actions/checkout@v3
+
+    - name: Set up Python 3.9
+      uses: actions/setup-python@v3
+      with:
+        python-version: 3.9
+
+    - name: List dependencies
+      run: |
+        pip freeze
+
+    - name: Lint
+      run: |
+        pip install 'black==22.6.0' 'flake8==5.0.3' 'pydocstyle==6.1.1'
+
+        black -l 79 --check deepdow/ tests
+        flake8 deepdow tests
+        pydocstyle deepdow
+
+  testing:
+    needs: linting
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        python-version: ['3.10', '3.11']
+    steps:
+    - name: Checkout most recent commit
+      uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v3
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install dependencies
+      run: |
+        pip install .[dev,docs,examples]
+
+    - name: List dependencies
+      run: |
+        pip freeze
+
+    - name: Run unittests
+      run: |
+        pytest
+
+    - name: Run doctests
+      run: |
+        pip install sphinx
+        sphinx-build -b doctest docs/ temp_doctest
+        
+    - name: Run coverage
+      uses: codecov/codecov-action@v3
